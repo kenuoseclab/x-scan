@@ -1,0 +1,1 @@
+{'vulname': 'gitÐÅÏ¢Ð¹Â©Â©¶´', 'payload': '/.git/config', 'result': 'http://127.0.0.1:88/.git/config', 'query': '', 'url': 'http://127.0.0.1:88'}

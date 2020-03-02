@@ -9,11 +9,8 @@ if sys.version <= '2':
     sys.setdefaultencoding('utf8')
 import requests
 import re
+from lib.elastic import *
 
-
-TIMEOUT = 5
-THREAD_COUNT = 50
-TOO_LONG = 50 * 1024 * 1024
 
 def banner():
     print("""
@@ -38,7 +35,7 @@ def parse_args():
     parser.error = parser_error
     parser._optionals.title = "OPTIONS"
     parser.add_argument('-p', '--poc', help="payload name", default="",required=False)
-    parser.add_argument('-l', '--poclist', help="list payload", default=False,required=False)
+    parser.add_argument('-l', '--poclist', help="list payload", default=False,required=False,action="store_true")
     parser.add_argument('-i', '--input', help="targets,ip or host,ips,file", default="target.txt",required=False)
     parser.add_argument('-o', '--output', help='save the result to text file', nargs='?', default="result.txt",required=False)
     parser.add_argument('-n', '--thread', help='set thread numbers',default=10)
@@ -57,16 +54,35 @@ def writefile(pfile,content):
     fp.write("\n")
     fp.close()
 
+def search_assert(query):
+    targets = []
+    query = convertrule(query)
+    result = search(query)
+    if result:
+        total = result["hits"]["total"]
+        #total = result["hits"]["total"]["value"]   #Elasticsearch的版本不同，可能会有所不同
+        if total > 0 :
+            for t in result["hits"]["hits"]:
+                host = t["_source"]["host"]
+                port = t["_source"]["port"]
+                protocol = t["_source"]["protocol"]
+                target = "%s://%s:%s" % (protocol,host,str(port))
+                targets.append(target)
+    return targets
+
 """
 input 有3种情况：
 1、单个目标
 2、文件列表
 3、多个目标
+4、Elasticsearch 中检索目标
 """
 def gettarget(input):
     targets = []
     if os.path.exists(input):  #输入的是否为文件
         targets = readfile(input).split("\n")
+    elif input.startswith("q:"):
+        targets = search_assert(input[2:])
     elif "," in input:  #多目标
         targets = input.split(",")
     else:
@@ -86,8 +102,8 @@ def listpoc(flag=0):
         if flag ==0:
             print("poc lists:\n")
             for poc in pocs:
-                print(poc + "\n")
-            print("poc tatal: %d " % len(pocs))
+                print(poc)
+            print("\npoc tatal: %d " % len(pocs))
     except Exception as e:
         print("poc list load error.\t" + str(e))
 
@@ -127,8 +143,10 @@ if __name__ == "__main__":
         for pocname in pocs:
             _temp = __import__("pocs."+pocname)
             f = getattr(_temp,pocname)
-
-            targets = gettarget(input)
+            if input =="q":
+                targets = gettarget("q:"+f.query)
+            else:
+                targets = gettarget(input)
             #print(targets)
             for target in targets:
                 target = target.strip()
