@@ -56,18 +56,20 @@ def writefile(pfile,content):
 
 def search_assert(query):
     targets = []
-    query = convertrule(query)
-    result = search(query)
-    if result:
-        total = result["hits"]["total"]
-        #total = result["hits"]["total"]["value"]   #Elasticsearch的版本不同，可能会有所不同
-        if total > 0 :
-            for t in result["hits"]["hits"]:
-                host = t["_source"]["host"]
-                port = t["_source"]["port"]
-                protocol = t["_source"]["protocol"]
-                target = "%s://%s:%s" % (protocol,host,str(port))
-                targets.append(target)
+    result = elastic_search(query)
+    try:
+        if result:
+            total = result["total"]
+            #print(total)
+            if total > 0 :
+                for t in result["hits"]:
+                    host = t["_source"]["host"]
+                    port = t["_source"]["port"]
+                    protocol = t["_source"]["protocol"]
+                    target = "%s://%s:%s" % (protocol,host,str(port))
+                    targets.append(target)
+    except Exception as e:
+        print(e)
     return targets
 
 """
@@ -120,7 +122,6 @@ if __name__ == "__main__":
     banner()
     args = parse_args()
     poc = args.poc
-    #param = args.param
     input = args.input
     output = args.output
     l = args.poclist
@@ -140,18 +141,31 @@ if __name__ == "__main__":
                     p = p.strip()
                     if p not in pocs:
                         pocs.append(p) 
+        print("Getting targets.")
+        if input =="q":
+            targets = gettarget("q:"+f.query)
+        else:
+            targets = gettarget(input)
+        #print(targets)
+        print("Found %d targets " % len(targets))
+
+        print("%d pocs" % len(pocs))
         for pocname in pocs:
             _temp = __import__("pocs."+pocname)
             f = getattr(_temp,pocname)
-            if input =="q":
-                targets = gettarget("q:"+f.query)
-            else:
-                targets = gettarget(input)
-            #print(targets)
             for target in targets:
                 target = target.strip()
                 if target :
                     scan = f.scannerclass(target)
                     pool.run(scan.scanner, '',callback=callback)
-
     pool.close()
+    
+    try:
+        while True:
+            pass
+    except KeyboardInterrupt as e:
+        print('User aborted the scan!')
+        print('Waiting for the thread to terminate')
+        pool.terminate()
+    except Exception:
+        pass
