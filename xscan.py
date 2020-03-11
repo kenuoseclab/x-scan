@@ -140,7 +140,9 @@ if __name__ == "__main__":
                 for p in poc.split(","):
                     p = p.strip()
                     if p not in pocs:
-                        pocs.append(p) 
+                        pocs.append(p)
+            else:
+                pocs.append(poc)
         print("Getting targets.")
         if input =="q":
             targets = gettarget("q:"+f.query)
